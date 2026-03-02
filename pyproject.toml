@@ -1,7 +1,15 @@
 [project]
 name = "plex-toolbox"
 version = "0.1.0"
-description = "Add your description here"
+description = "Small CLI interface full of python tools to help with Plex management and maintenance."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "dotenv==0.9.9",
+    "pip>=26.0.1",
+    "rich==14.3.3",
+    "typer==0.24.1",
+]
+
+[project.scripts]
+plex-toolbox = "plex_toolbox.cli:app"

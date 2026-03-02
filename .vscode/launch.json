@@ -1,0 +1,19 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Plex TV Renamer",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "program": "${workspaceFolder}/scripts/tv_file_namer.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/scripts",
+            // "args": ["shows"]
+        }
+    ]
+}

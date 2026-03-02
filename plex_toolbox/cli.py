@@ -67,6 +67,7 @@ def name_tv_files(
         print(f"Destination root: {output_dir}")
         print(f"Season type: {season_type}")
         print(f"Dry run: {dry_run}\n")
+        # TODO: This is slow
         client.populate_series_episodes(series_info, season_type=season_type, localization_lang=localization_lang)
         # For each file, rename according to the selected mode
         for f in files:
@@ -92,6 +93,8 @@ def name_tv_files(
                 # In confirm/manual modes, you might want to keep going; in auto mode, we just skip.
                 continue
             # Get the episode title (English-first) from the TVDB API, and construct the new filename and destination path
+            if tvdb_episode.localized_title is None:
+                tvdb_episode.localized_title = client.get_localized_episode_title(tvdb_episode.id, language=localization_lang)
             dest = tvdb_episode.plex_filepath(output_dir, series_info, f.suffix.lower())
             # Confirm if in confirm mode
             if mode == "confirm":

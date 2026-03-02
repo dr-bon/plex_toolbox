@@ -269,16 +269,16 @@ class TvdbClient:
         page = 0
         while True:
             payload = self.series_episodes_by_season_type(series_info.id, season_type=season_type, page=page)
-            items = payload.get("data") or []
+            items = payload.get("data", {})
             for ep in items.get("episodes", []):
                 ep_id = ep.get("id")
                 ep_title = ep.get("name")
                 absolute_ep_number = ep.get("absoluteNumber")
                 seasonalized_ep_number = ep.get("number")
                 season_number = ep.get("seasonNumber")
-                localized_title = self.get_localized_episode_title(ep_id, localization_lang)
+                # localized_title = self.get_localized_episode_title(ep_id, localization_lang)
                 raw = ep
-                series_episodes.append(TVDBEpisode(id=ep_id, title=ep_title, absolute_ep_number=absolute_ep_number, seasonalized_ep_number=seasonalized_ep_number, season_number=season_number, localized_title=localized_title, raw=raw))
+                series_episodes.append(TVDBEpisode(id=ep_id, title=ep_title, absolute_ep_number=absolute_ep_number, seasonalized_ep_number=seasonalized_ep_number, season_number=season_number, localized_title=None, raw=raw))
             links = payload.get("links") or {}
             next_page = links.get("next")
             # TVDB uses 0-based pages; if next is null/None, we're done.
@@ -315,82 +315,3 @@ class TvdbClient:
                 return val.strip()
 
         return None
-
-
-def name_tv_files(folder: Path, tv_root: Path = Path("./TV"), season_type: str = "official", dry_run: bool = True, localization_lang: str = "eng") -> None:
-    # Load the API key from environment or .env file
-    load_dotenv()
-    api_key = os.getenv("TVDB_API_KEY")
-    if not api_key:
-        raise ValueError("TVDB_API_KEY not found in environment variables.")
-    # Login to the TVDB API
-    with TvdbClient(api_key=api_key) as client:
-        client.login()
-        # Ask the user for the show title
-        show_query = input("Enter a TV show name (you can include the year to improve search relevance): ").strip()
-        # Try to guess the year from what they provided, to improve search relevance (but it's optional)
-        year_hint = extract_year_from_show_query(show_query)
-        # Search TVDB for the show
-        hits = client.search_series(show_query, year=year_hint)
-        # If we couldn't find anything, exit out with error
-        if not hits:
-            print(f"[red]No TVDB results for:[/] {show_query}")
-            sys.exit(1)
-        # Prompt the user for the show they want from the search results (if there's more than one), and get the series ID
-        selected_series_data = select_show_from_hits(hits)
-        # series_id = int(selected["tvdb_id"])
-        series_info = client.get_series_info(selected_series_data)
-        # Then prompt the user for the mode they want to use for renaming (auto, confirm, manual)
-        mode = _prompt_mode()
-        files = _list_video_files(folder)
-        if not files:
-            print(f"[yellow]No video files found in[/] {folder}")
-            sys.exit(1)
-        print(f"\nSelected: [bold]{series_info.plex_show_folder}[/bold] (TVDB {series_info.id})")
-        print(f"Found {len(files)} files in {folder}")
-        print(f"Destination root: {tv_root}")
-        print(f"Season type: {season_type}")
-        print(f"Dry run: {dry_run}\n")
-        client.populate_series_episodes(series_info, season_type=season_type, localization_lang=localization_lang)
-        # For each file, rename according to the selected mode
-        for f in files:
-            season_ep: tuple[int, int] | None = None
-            # If auto/confirm mode, try to infer season/episode from the filename; if we can't, skip (auto) or ask (confirm)
-            if mode in ("auto", "confirm"):
-                season_ep = _infer_season_and_ep_numbers_from_filename(f.name)
-                if not season_ep:
-                    print(f"[yellow]Could not infer S/E from filename:[/] {f.name}")
-                    if mode == "auto":
-                        continue
-            # If the mode is manual, or if we're in confirm mode and couldn't infer S/E, prompt the user for season/episode numbers
-            if mode == "manual" or (mode == "confirm" and not season_ep):
-                season = typer.prompt(f"{f.name} - season #", type=int)
-                episode = typer.prompt(f"{f.name} - episode #", type=int)
-                season_ep = (season, episode)
-            # Get the episode ID from our index
-            season, episode = season_ep
-            episode = series_info.get_episode(season, episode)
-            if not episode:
-                print(f"[yellow]No episode found for[/] {series_info.plex_show_folder} s{season:02d}e{episode:02d} (season_type={season_type})")
-                # In confirm/manual modes, you might want to keep going; in auto mode, we just skip.
-                continue
-            # Get the episode title (English-first) from the TVDB API, and construct the new filename and destination path
-            dest = episode.plex_filepath(tv_root, series_info, f.suffix.lower())
-            # Confirm if in confirm mode
-            if mode == "confirm":
-                print(f"[cyan]Proposed[/] {f.name} -> {dest}")
-                ok = typer.confirm("Rename/move this file?", default=True)
-                if not ok:
-                    continue
-            # Show dry run, or actually move the file if not a dry run
-            if dry_run:
-                print(f"[cyan]DRY RUN[/] {f} -> {dest}")
-            else:
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(f), str(dest))
-                print(f"[green]MOVED[/] {f} -> {dest}")
-        # Done
-        print("\n[bold green]Done.[/bold green]")
-
-if __name__ == "__main__":
-    name_tv_files(Path("shows"))

@@ -15,7 +15,7 @@ from plex_toolbox.tvdb import TVDBClient, extract_localized_show_title, normaliz
 from plex_toolbox.utilities.constants import VIDEO_EXTENSIONS
 from plex_toolbox.utilities.regex import REGEX_PATTERN_YEAR, REGEX_PATTERNS_TV
 
-tv_app = typer.Typer(help="Plex TV tools.")
+tv_app = typer.Typer(help="Plex TV tools.", no_args_is_help=True)
 
 console = Console()
 

@@ -1,5 +1,5 @@
 [project]
-name = "plex-toolbox"
+name = "plex-tbx"
 version = "0.1.1"
 description = "Small CLI interface full of python tools to help with Plex management and maintenance."
 readme = "README.md"
@@ -13,4 +13,4 @@ dependencies = [
 ]
 
 [project.scripts]
-plex-toolbox = "plex_toolbox.cli:app"
+plex-tbx = "plex_toolbox.cli.app:app"

@@ -1,90 +1,82 @@
 from __future__ import annotations
 
-import argparse
-import sys
 from pathlib import Path
 
+import typer
+from rich.console import Console
 from yt_dlp import YoutubeDL
-from yt_dlp.utils import DownloadError
+
+youtube_app = typer.Typer(help="Plex YouTube tools.", no_args_is_help=True)
+
+console = Console()
 
 
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Download YouTube videos + captions (requires rights/permission).")
-    p.add_argument("url", help="YouTube video URL")
-    p.add_argument("--out", default="./downloads", help="Output directory (default: ./downloads)")
-    p.add_argument(
-        "--lang",
-        default="en",
-        help='Subtitle language(s), comma-separated (default: "en"). Example: "en,es"',
-    )
-    p.add_argument(
-        "--auto",
-        action="store_true",
-        help="Download auto-generated captions too (if available).",
-    )
-    p.add_argument(
-        "--no-video",
-        action="store_true",
-        help="Only download captions (skip video).",
-    )
-    p.add_argument(
-        "--srt",
-        action="store_true",
-        help="Convert subtitles to .srt when possible (requires ffmpeg).",
-    )
-    return p.parse_args()
-
-
-def main() -> int:
-    args = parse_args()
-
-    out_dir = Path(args.out).expanduser().resolve()
+@youtube_app.command("dl", help="Download YouTube video/audio with optional subtitles.")
+def download_cmd(
+    url: str = typer.Argument(..., help="YouTube URL"),
+    out_dir: Path = typer.Option("./downloads", help="Output directory"),
+    audio_only: bool = typer.Option(False, help="Download audio only (m4a)"),
+    subtitles: str = typer.Option(None, help='Subtitle languages, e.g. "en,es"'),
+    auto_subs: bool = typer.Option(False, help="Include auto-generated subtitles"),
+    srt: bool = typer.Option(False, help="Convert subtitles to .srt"),
+):
+    """
+    Download from YouTube with support for:
+    - audio-only
+    - video
+    - subtitles (manual + auto)
+    """
+    out_dir = out_dir.expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # yt-dlp output template:
-    # downloads/<title> [<id>].<ext>
     outtmpl = str(out_dir / "%(title)s [%(id)s].%(ext)s")
-
-    langs = [x.strip() for x in args.lang.split(",") if x.strip()]
 
     ydl_opts = {
         "outtmpl": outtmpl,
-        "noplaylist": True,  # set to False if you want playlist support
-        "writesubtitles": True,
-        "writeautomaticsub": bool(args.auto),
-        "subtitleslangs": langs,
-        "subtitlesformat": "best",
+        "noplaylist": True,
         "quiet": False,
         "no_warnings": False,
     }
 
-    if args.no_video:
-        # Skip video download; only fetch subs/metadata
-        ydl_opts["skip_download"] = True
+    # Audio-only mode
+    if audio_only:
+        ydl_opts.update(
+            {
+                "format": "bestaudio",
+                "extract_audio": True,
+                "audio_format": "m4a",
+                "audio_quality": 0,
+                "postprocessors": [
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "m4a",
+                        "preferredquality": "0",
+                    }
+                ],
+            }
+        )
     else:
-        # Prefer MP4 if possible, otherwise best available
+        # Prefer MP4 video if available
         ydl_opts["format"] = "bv*+ba/best"
 
-        # If you strictly want MP4 when available:
-        # ydl_opts["format"] = "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best"
+    # Subtitles
+    if subtitles:
+        langs = [x.strip() for x in subtitles.split(",") if x.strip()]
+        ydl_opts["writesubtitles"] = True
+        ydl_opts["subtitleslangs"] = langs
+        ydl_opts["subtitlesformat"] = "best"
 
-    if args.srt:
-        # Convert subtitle files to .srt (requires ffmpeg)
-        ydl_opts["postprocessors"] = [
-            {"key": "FFmpegSubtitlesConvertor", "format": "srt"},
-        ]
+    if auto_subs:
+        ydl_opts["writeautomaticsub"] = True
+
+    if srt:
+        ydl_opts["postprocessors"] = [{"key": "FFmpegSubtitlesConvertor", "format": "srt"}]
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([args.url])
-        return 0
-    except DownloadError as e:
-        print(f"Download failed: {e}", file=sys.stderr)
-        return 2
+            ydl.download([url])
     except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
-        return 3
+        typer.echo(f"Download failed: {e}")
+        raise typer.Exit(code=1)
 
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    typer.echo("Download complete.")

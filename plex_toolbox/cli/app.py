@@ -2,13 +2,16 @@ from __future__ import annotations  # Until Python 3.14
 
 import typer
 
+from plex_toolbox.cli.commands.audio import audio_app
 from plex_toolbox.cli.commands.tv import tv_app
+from plex_toolbox.cli.commands.youtube import youtube_app
 
 app = typer.Typer(name="ptb", help="A collection of tools for managing Plex media libraries.", no_args_is_help=True)
 
 # TODO: manifest app
+app.add_typer(audio_app, name="audio")
 app.add_typer(tv_app, name="tv")
-# TODO: youtube app
+app.add_typer(youtube_app, name="yt")
 
 if __name__ == "__main__":
     app()
